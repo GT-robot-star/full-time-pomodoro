@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>社会人ポモドーロ</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 50px;
+    }
+    #timer {
+      font-size: 48px;
+      margin: 20px;
+    }
+    button {
+      font-size: 18px;
+      margin: 5px;
+      padding: 10px 20px;
+    }
+  </style>
+</head>
+<h1>社会人ポモドーロ</h1>
+<div id="timer">25:00</div>
+<div id="status">作業中</div>
+<div id="cycles">サイクル: 0</div>
+<div id="total">合計作業時間: 0分</div>
+<button id="startBtn">▶ スタート</button>
+<button id="resetBtn">⏹ リセット</button>
+<button id="settingsBtn">⚙ 設定</button>
+
+<!-- 設定モーダル -->
+<div id="settingsModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5);">
+  <div style="background:#fff; padding:20px; margin:100px auto; width:300px; border-radius:8px;">
+    <h2>設定</h2>
+    <label>作業時間(分): <input type="number" id="workInput" value="25"></label><br><br>
+    <label>休憩時間(分): <input type="number" id="breakInput" value="5"></label><br><br>
+    <label>長休憩時間(分): <input type="number" id="longBreakInput" value="15"></label><br><br>
+    <label>長休憩までのサイクル数: <input type="number" id="cycleInput" value="4"></label><br><br>
+    <label>1日の目標時間(時間): <input type="number" id="goalInput" value="8"></label><br><br>
+    <button id="saveSettings">保存</button>
+    <button id="closeSettings">閉じる</button>
+  </div>
+</div>
+
+
+  <script>
+let workMinutes = 25;
+let breakMinutes = 5;
+let longBreakMinutes = 15;
+let cyclesBeforeLongBreak = 4;
+let dailyGoalHours = 8;
+
+let time = workMinutes * 60;
+let isWorking = true;
+let timerInterval;
+let cycleCount = 0;
+let totalWorkMinutes = 0;
+
+const timerDisplay = document.getElementById("timer");
+const statusDisplay = document.getElementById("status");
+const cyclesDisplay = document.getElementById("cycles");
+const totalDisplay = document.getElementById("total");
+const startBtn = document.getElementById("startBtn");
+const resetBtn = document.getElementById("resetBtn");
+
+const settingsBtn = document.getElementById("settingsBtn");
+const settingsModal = document.getElementById("settingsModal");
+const workInput = document.getElementById("workInput");
+const breakInput = document.getElementById("breakInput");
+const longBreakInput = document.getElementById("longBreakInput");
+const cycleInput = document.getElementById("cycleInput");
+const goalInput = document.getElementById("goalInput");
+const saveSettings = document.getElementById("saveSettings");
+const closeSettings = document.getElementById("closeSettings");
+
+function updateDisplay() {
+  let minutes = Math.floor(time / 60);
+  let seconds = time % 60;
+  timerDisplay.textContent =
+    String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+  cyclesDisplay.textContent = "サイクル: " + cycleCount;
+  totalDisplay.textContent =
+    "合計作業時間: " + totalWorkMinutes + "分 / 目標 " + (dailyGoalHours * 60) + "分";
+}
+
+function startTimer() {
+  if (!timerInterval) {
+    timerInterval = setInterval(() => {
+      if (time > 0) {
+        time--;
+        updateDisplay();
+      } else {
+        if (isWorking) {
+          cycleCount++;
+          totalWorkMinutes += workMinutes; // 作業時間を合計に追加
+          if (cycleCount % cyclesBeforeLongBreak === 0) {
+            alert("作業終了！長休憩に入りましょう。");
+            time = longBreakMinutes * 60;
+            statusDisplay.textContent = "長休憩中";
+          } else {
+            alert("作業終了！休憩しましょう。");
+            time = breakMinutes * 60;
+            statusDisplay.textContent = "休憩中";
+          }
+          isWorking = false;
+        } else {
+          alert("休憩終了！作業を再開しましょう。");
+          time = workMinutes * 60;
+          statusDisplay.textContent = "作業中";
+          isWorking = true;
+        }
+        updateDisplay();
+
+        // 目標達成チェック
+        if (totalWorkMinutes >= dailyGoalHours * 60) {
+          alert("🎉 今日の目標を達成しました！お疲れさま！");
+          resetTimer();
+        }
+      }
+    }, 1000);
+  }
+}
+
+function resetTimer() {
+  clearInterval(timerInterval);
+  timerInterval = null;
+  isWorking = true;
+  cycleCount = 0;
+  totalWorkMinutes = 0;
+  time = workMinutes * 60;
+  statusDisplay.textContent = "作業中";
+  updateDisplay();
+}
+
+// 設定を保存
+saveSettings.addEventListener("click", () => {
+  workMinutes = parseInt(workInput.value);
+  breakMinutes = parseInt(breakInput.value);
+  longBreakMinutes = parseInt(longBreakInput.value);
+  cyclesBeforeLongBreak = parseInt(cycleInput.value);
+  dailyGoalHours = parseInt(goalInput.value);
+
+  resetTimer(); // 設定変更後にリセット
+  settingsModal.style.display = "none";
+
+  // 保存して次回起動時にも使えるようにする
+  localStorage.setItem("pomodoroSettings", JSON.stringify({
+    workMinutes, breakMinutes, longBreakMinutes, cyclesBeforeLongBreak, dailyGoalHours
+  }));
+});
+
+// 設定モーダルの開閉
+settingsBtn.addEventListener("click", () => {
+  settingsModal.style.display = "block";
+});
+closeSettings.addEventListener("click", () => {
+  settingsModal.style.display = "none";
+});
+
+// 保存された設定を読み込む
+window.onload = () => {
+  const saved = localStorage.getItem("pomodoroSettings");
+  if (saved) {
+    const s = JSON.parse(saved);
+    workMinutes = s.workMinutes;
+    breakMinutes = s.breakMinutes;
+    longBreakMinutes = s.longBreakMinutes;
+    cyclesBeforeLongBreak = s.cyclesBeforeLongBreak;
+    dailyGoalHours = s.dailyGoalHours;
+
+    workInput.value = workMinutes;
+    breakInput.value = breakMinutes;
+    longBreakInput.value = longBreakMinutes;
+    cycleInput.value = cyclesBeforeLongBreak;
+    goalInput.value = dailyGoalHours;
+  }
+  resetTimer();
+};
+
+startBtn.addEventListener("click", startTimer);
+resetBtn.addEventListener("click", resetTimer);
+
+updateDisplay();
+  </script>
+</body>
+</html>
